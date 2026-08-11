@@ -4686,6 +4686,9 @@ def inspect_white_noise_inside_rim(
       "rim"         WaferRimBand        — 검출된 흰색 띠
       "pattern"     DiePatternModel     — 쓰인 golden die 모델
       "roi_mask"    uint8               — 실제 검사한 고리 영역
+      "roi_bgr"     uint8 (h,w,3)       — 원본에서 실제 검사 고리만 남긴 BGR 이미지
+      "inner_mask"  uint8               — 검사 고리를 제외한 wafer 안쪽 영역
+      "inner_bgr"   uint8 (h,w,3)       — 원본에서 검사 고리 안쪽만 남긴 BGR 이미지
       "raw_mask"    uint8               — 필터 전 이진화 결과
       "zscore"      float32             — 사용한 z 맵 (use_pattern_model=True)
       "stats"       dict                — {"total","pass","area","shape","repeat"}
@@ -4785,6 +4788,12 @@ def inspect_white_noise_inside_rim(
       with_overlay       True   False 면 overlay 를 만들지 않는다(약간 빠름)
       keep_rejected      False  True 면 탈락분을 reason("area"/"shape"/"repeat")
                                 과 함께 result["rejected"] 에 남긴다
+
+      ROI를 직접 후처리할 때는 result["roi_bgr"](검사 고리)와
+      result["inner_bgr"](그 고리를 뺀 wafer 안쪽)을 바로 사용한다.
+      동일한 마스크로 원본을 다시 추출하려면 아래처럼 쓴다.
+        cv2.bitwise_and(bgr, bgr, mask=result["roi_mask"])
+        cv2.bitwise_and(bgr, bgr, mask=result["inner_mask"])
     """
     bgr = _noise_load_bgr(image)
     gray = _gray_u8(bgr)
@@ -4826,6 +4835,12 @@ def inspect_white_noise_inside_rim(
     r_in = max(0.0, min(r_in, r_out))
     roi = (rad >= r_in) & (rad <= r_out)
     roi_u8 = roi.astype(np.uint8) * 255
+    # 요청한 검사 고리와 그 안쪽 잔여 영역을 원본 BGR에서 바로 꺼낸다.
+    # inner 는 wafer 내부만 포함하므로 rim/wafer 밖은 모두 검정이다.
+    inner = (rad < r_in) & (rad <= rr)
+    inner_u8 = inner.astype(np.uint8) * 255
+    roi_bgr = cv2.bitwise_and(bgr, bgr, mask=roi_u8)
+    inner_bgr = cv2.bitwise_and(bgr, bgr, mask=inner_u8)
 
     # ---- 3) 검출 신호 -----------------------------------------------------
     model: Optional[DiePatternModel] = pattern_model
@@ -4982,6 +4997,9 @@ def inspect_white_noise_inside_rim(
         "rim": rim,
         "pattern": model,
         "roi_mask": roi_u8,
+        "roi_bgr": roi_bgr,
+        "inner_mask": inner_u8,
+        "inner_bgr": inner_bgr,
         "raw_mask": raw_mask,
         "zscore": z,
         "stats": {"total": int(num - 1), **counts},
