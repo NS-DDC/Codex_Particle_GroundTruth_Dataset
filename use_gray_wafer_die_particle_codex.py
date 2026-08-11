@@ -110,10 +110,38 @@
 # - 이 안내와 원본의 상세 docstring을 함께 보면, 필요한 호출에만 파라미터를
 #   직접 적어 사용하는 방식으로 관리할 수 있습니다.
 #
+# =============================================================================
+# 편집 섹터 지도 — Ctrl+F로 "[SECTOR:" 또는 아래 ID를 검색
+# =============================================================================
+# 코드를 수정할 때는 기능에 맞는 섹터만 열어 변경합니다. 섹터 사이의 호출 계약과
+# 기본값은 그대로 두면, 지금까지 쌓인 검출/보정 로직을 안전하게 조합할 수 있습니다.
+#
+# [SECTOR: 10_CORE_AND_WAFER]       공통 이미지 변환, wafer 원판 검출
+# [SECTOR: 20_DIE_GRID_DETECTION]   pitch·grid origin·corner/cross 검출
+# [SECTOR: 30_DIE_MAP_GEOMETRY]     die crop, WaferDieMap, edge 판정
+# [SECTOR: 40_ALIGNMENT_AND_CLEAN]  notch/직선/die-render 회전 보정, 외부 정리
+# [SECTOR: 50_GRID_ORIGIN_REFINEMENT] phase matching, street 폭, origin 미세 보정
+# [SECTOR: 60_DIE_MAP_BUILD_API]    build_die_map() — die map 생성 파이프라인
+# [SECTOR: 61_DIE_MAP_LOOKUP_API]   locate_die() — 좌표/BBox에서 die 조회
+# [SECTOR: 70_WHITE_RIM_PARTICLE]   rim 측정부터 particle 판정까지의 독립 파이프라인
+# [SECTOR: 71_RIM_DETECTION]        흰 외곽선(rim) 반경 측정
+# [SECTOR: 72_PATTERN_MODEL]        golden die 모델, pitch 추정/보정
+# [SECTOR: 73_PARTICLE_INSPECTION]  inspect_white_noise_inside_rim() 후보 판정
+# [SECTOR: 74_PARTICLE_RENDERING]   overlay/진단 이미지 표시
+# [SECTOR: 75_ONE_STEP_API]         detect_white_noise() — map 생성+검사 래퍼
+# [SECTOR: 90_USAGE_REFERENCE]      복사해 쓰는 호출 예시와 반환값 레퍼런스
+#
+# 수정 시작점
+# - die map 결과가 틀리면: 20 -> 50 -> 60 순서로 확인합니다.
+# - die 좌표·crop·edge만 틀리면: 30 또는 61을 확인합니다.
+# - 회전/노치 문제면: 40을 확인합니다.
+# - particle 오검출/미검출이면: 71 -> 72 -> 73 순서로 확인합니다.
+# - 호출 방식/반환값만 확인할 때: 60, 61, 75, 90을 봅니다.
+#
 
 # -*- coding: utf-8 -*-
 # =============================================================================
-#  use_gray_wafer_die_particle_claude.py
+#  use_gray_wafer_die_particle_codex.py
 # -----------------------------------------------------------------------------
 #  wafer_die_map_v5.py (V5.5) 본체 + use_gray_wafer_die_particle.py 의
 #  **코너(격자 원점) 검출 로직만** 이식한 병합본. 나머지는 V5.5 그대로다.
@@ -306,6 +334,7 @@ __all__ = ["WaferDieMap", "build_die_map", "locate_die", "crop_die",
 
 
 # #############################################################################
+# [SECTOR: 10_CORE_AND_WAFER] 공통 이미지 처리와 wafer/기초 격자 검출
 # #                                                                           #
 # #   CORE DETECTION  (원본 로직 그대로 — 수정 금지 영역)                      #
 # #   wafer_die_index_extract_39.py 에서 복사. 동작/결과 동일.                #
@@ -839,7 +868,8 @@ def _resolve_pitch(bands: List[Tuple[float, int, int, float]],
 
 
 # =============================================================================
-# ★[claude] Gray wafer 전용 코너(십자) 검출 — use_gray_wafer_die_particle.py 이식
+# [SECTOR: 20_DIE_GRID_DETECTION] Gray/corner/cross 기반 die grid 검출
+# ★[codex] Gray wafer 전용 코너(십자) 검출 — use_gray_wafer_die_particle.py 이식
 # -----------------------------------------------------------------------------
 # 아래 블록은 use_gray_wafer_die_particle.py 에서 **코너(격자 원점) 찾는 로직만**
 # 그대로 가져온 것이다. V5.5 본체의 나머지 파이프라인(회전 보정 / wafer 검출 /
@@ -1772,6 +1802,7 @@ def detect_grid(image_bgr: np.ndarray,
 
 
 # =============================================================================
+# [SECTOR: 30_DIE_MAP_GEOMETRY] die crop, map 자료구조, edge/좌표 기하
 # 3) Die clip (한 die crop)
 # =============================================================================
 def clip_die(image: np.ndarray, center_x: float, center_y: float,
@@ -2142,6 +2173,7 @@ def crop_die(image: np.ndarray, center_x: float, center_y: float,
 
 
 # =============================================================================
+# [SECTOR: 40_ALIGNMENT_AND_CLEAN] notch·직선·die-render 회전 보정과 wafer 정리
 # (0) Notch 기반 회전(angle) 보정 — build_die_map 의 모든 연산 전에 적용
 # =============================================================================
 def _wafer_silhouette(gray: np.ndarray, black_thr: int, open_ksize: int) -> np.ndarray:
@@ -3219,6 +3251,7 @@ def validate_quadrant_edges(dies: List[Dict[str, Any]],
 
 
 # =============================================================================
+# [SECTOR: 50_GRID_ORIGIN_REFINEMENT] phase matching과 street 기반 origin 정밀 보정
 # (0.9) ★ grid origin 서브픽셀 보정 — phase folding + half-max 교차점 중점
 #
 # 왜 필요한가
@@ -3659,6 +3692,7 @@ def refine_grid_origin(image_bgr: np.ndarray,
 
 
 # =============================================================================
+# [SECTOR: 60_DIE_MAP_BUILD_API] build_die_map() — wafer 이미지에서 전체 die map 생성
 # (1) wafer 이미지 -> Die Map (EDGE 포함)
 # =============================================================================
 def build_die_map(image: Union[str, Path, np.ndarray],
@@ -3991,6 +4025,7 @@ def build_die_map(image: Union[str, Path, np.ndarray],
 
 
 # =============================================================================
+# [SECTOR: 61_DIE_MAP_LOOKUP_API] locate_die() — 픽셀 좌표/BBox에서 die 조회
 # (2) 픽셀 좌표 / BBox -> die index + die rect + 실측 좌표
 # =============================================================================
 def locate_die(die_map: WaferDieMap,
@@ -4128,8 +4163,9 @@ def locate_die(die_map: WaferDieMap,
 
 
 # #############################################################################
+# [SECTOR: 70_WHITE_RIM_PARTICLE] 흰 rim 안쪽 particle 검출 전체 파이프라인
 # #                                                                           #
-# #   ★[claude] WHITE-RIM PARTICLE  —  wafer 외곽 흰색선 안쪽 '흰 노이즈' 검출  #
+# #   ★[codex] WHITE-RIM PARTICLE  —  wafer 외곽 흰색선 안쪽 '흰 노이즈' 검출   #
 # #                                                                           #
 # #   die map 을 만든 '다음 단계' 로 돌리는 독립 모듈.  위쪽 파이프라인(회전     #
 # #   보정 / wafer 검출 / 코너 / die map)은 전혀 건드리지 않는다.               #
@@ -4270,6 +4306,7 @@ def _radial_map(shape: Tuple[int, int], cx: float, cy: float) -> np.ndarray:
 
 
 # =============================================================================
+# [SECTOR: 71_RIM_DETECTION] 흰 외곽선 반경/폭 측정
 # 1) 흰색 외곽선(띠) 검출
 # =============================================================================
 def detect_wafer_rim_band(image: Union[str, Path, np.ndarray],
@@ -4346,6 +4383,7 @@ def detect_wafer_rim_band(image: Union[str, Path, np.ndarray],
 
 
 # =============================================================================
+# [SECTOR: 72_PATTERN_MODEL] golden die 모델과 pattern pitch 추정/미세 보정
 # 2) golden die (위상 타일) 패턴 모델
 # =============================================================================
 def _fold_axis_residual(values: np.ndarray, coord: np.ndarray,
@@ -4577,6 +4615,7 @@ def die_pattern_zscore(gray: np.ndarray, model: DiePatternModel,
 
 
 # =============================================================================
+# [SECTOR: 73_PARTICLE_INSPECTION] 후보 생성, 모양/반복 패턴 필터, 최종 particle 판정
 # 3) 본체 — 흰색 띠 안쪽 흰 노이즈 검사
 # =============================================================================
 def _bbox_corners(x1: int, y1: int, x2: int, y2: int
@@ -4986,6 +5025,7 @@ def inspect_white_noise_inside_rim(
 
 
 # =============================================================================
+# [SECTOR: 74_PARTICLE_RENDERING] 합격/탈락 후보 overlay와 진단 시각화
 # 4) 시각화
 # =============================================================================
 def render_white_noise_overlay(image: Union[str, Path, np.ndarray],
@@ -5057,6 +5097,7 @@ def render_white_noise_diagnostic_overlay(image: Union[str, Path, np.ndarray],
 
 
 # ---------------------------------------------------------------- 한 번에 부르기
+# [SECTOR: 75_ONE_STEP_API] detect_white_noise() — die map 생성과 particle 검사를 한 번에
 def detect_white_noise(image: Union[str, Path, np.ndarray],
                        *,
                        die_map: Optional["WaferDieMap"] = None,
@@ -5119,6 +5160,7 @@ def detect_white_noise(image: Union[str, Path, np.ndarray],
 
 
 # =============================================================================
+# [SECTOR: 90_USAGE_REFERENCE] 호출 예시와 반환값 레퍼런스 — 수정 없이 복사해 사용
 # 사용 예시  (복붙해서 쓰는 파일이라 자동 실행 안 되도록 주석 처리해 둠.
 #            그대로 본인 코드에서 호출하면 됩니다.)
 # =============================================================================
