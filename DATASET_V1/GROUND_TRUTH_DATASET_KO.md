@@ -4,7 +4,7 @@
 
 이미지를 단색 바탕에서 새로 그리지 않는다. 실제 `Gray_Wafer` 원본을 V5 좌표계로 정렬·확대해 배경으로 유지하고, 실제 `Paticle/22.png` 형상을 크기·회전·밝기만 바꿔 합성한다. 따라서 Die 회로, street, wafer rim, 조명 불균일, 센서 노이즈가 남는다.
 
-각 생성 case에는 3000x3000 Gray PNG와 같은 이름의 JSON GT가 생긴다. Git에는 생성기·평가 코드만 올리고, 대용량 생성 PNG/결과는 `generated/`에 로컬 보관한다.
+각 생성 case에는 3000x3000 Gray PNG와 같은 이름의 JSON GT가 생긴다. Git에는 기준 샘플 2장과 JSON GT를 포함하고, 용량이 큰 diagnostic/error overlay는 `generated/evaluation/`에 로컬 보관한다.
 
 ## GT 레이블
 

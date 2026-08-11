@@ -1,2 +1,7 @@
-# Generated 3000x3000 images and their local result reports are reproducible.
-generated/
+# Keep two reference PNG/JSON GT samples in Git.  Large diagnostic/error
+# overlays remain reproducible local artifacts.
+generated/*
+!generated/manifest.json
+!generated/*_particle_gt.png
+!generated/*_particle_gt.json
+generated/evaluation/

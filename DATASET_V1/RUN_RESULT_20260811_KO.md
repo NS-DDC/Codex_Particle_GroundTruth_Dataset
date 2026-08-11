@@ -38,4 +38,4 @@
 - `generated/evaluation/111_particle_gt_diagnostic.png`: D/R/P 검사 상태
 - `generated/evaluation/111_particle_gt_errors.png`: 녹색 TP, 빨강 FP, 파랑 FN
 
-원본 PNG와 overlay는 용량 때문에 Git 추적 대상이 아니라 `generated/` 로컬 산출물이다. 생성기와 GT 스키마, 평가기는 Git에 추적된다.
+원본 PNG 샘플 2장과 JSON GT는 Git에 추적한다. 용량이 큰 diagnostic/error overlay는 `generated/evaluation/`의 로컬 산출물이고, 생성기와 GT 스키마, 평가기는 Git에 추적된다.

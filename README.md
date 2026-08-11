@@ -26,4 +26,4 @@ python DATASET_V1\evaluate_particle_ground_truth_v1.py `
   --dataset-dir DATASET_V1\generated
 ```
 
-생성 PNG와 evaluation overlay는 대용량이라 Git에는 넣지 않고 `DATASET_V1/generated/`에 로컬로 저장합니다.
+`DATASET_V1/generated/`에는 바로 확인 가능한 3000x3000 GT 샘플 2장과 JSON 정답지를 포함한다. 용량이 큰 diagnostic/error overlay는 Git에 넣지 않고 로컬 실행 시 생성한다.
