@@ -1,7 +1,0 @@
-# Keep two reference PNG/JSON GT samples in Git.  Large diagnostic/error
-# overlays remain reproducible local artifacts.
-generated/*
-!generated/manifest.json
-!generated/*_particle_gt.png
-!generated/*_particle_gt.json
-generated/evaluation/
